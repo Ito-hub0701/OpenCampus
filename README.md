@@ -1,14 +1,55 @@
-# OpenCampus
+# ImageProcessor for Unity
 
-Unityで制作した、オープンキャンパス向けのリアルタイム画像処理デモです。
+Unityの `WebCamTexture` から取得したカメラ映像に対して、CPU（C#）でリアルタイムに様々な画像処理（フィルターエフェクト）を適用するコンポーネントです。シェーダーを使わずに、ピクセル配列（`Color32[]`）を直接操作する基本的な画像処理アルゴリズムの実装例として最適です。
 
-Webカメラ映像に対してリアルタイムで画像処理を行い、
-「コンピュータが画像をどのように見ているか」を体験できる展示を目指しています。
+---
 
---- # Features ## Basic Filters | Mode | Description | |---|---| | Normal | 通常表示 | | Gray | グレースケール変換 | | Threshold | 二値化処理 | | Invert | 色反転 | --- ## Color Detection HSV 色空間を利用して特定色を抽出します。 | Mode | Description | |---|---| | Red | 赤色のみ抽出 | | Blue | 青色のみ抽出 | | Green | 緑色のみ抽出 | 検出対象以外は暗く表示することで、対象色を強調しています。 --- ## Image Effects | Mode | Description | |---|---| | Mosaic | モザイク処理 | | Posterize | ポスタライズ処理 | | Blur | ガウシアン風ぼかし | | Emboss | エンボス加工 | | Edge | エッジ検出 | --- ## Motion / Temporal Effects | Mode | Description | |---|---| | Motion | フレーム差分による動体検出 | | AfterImage | 残像エフェクト | --- ## Glitch / Visual Effects | Mode | Description | |---|---| | RGBSplit | RGB チャンネル分離 | | Glitch | ランダム画面ずらし演出 | --- # Technologies Used - Unity - C# - WebCamTexture - Texture2D - Real-time pixel processing --- # Processing Overview 毎フレーム `WebCamTexture.GetPixels32()` を使用してカメラ画像を取得し、 各ピクセルに対して画像処理を実行しています。 ```csharp Color32[] pixels = webcamTexture.GetPixels32();
+## 🚀 主な機能（搭載フィルター一覧）
 
-# ライセンス
+16種類の豊富なディスプレイモードを切り替えることができます。
 
-MIT License
-(自由に使っていいけど最低限のルールだけ守ってね)
+| モード名 | 処理内容 |
+| :--- | :--- |
+| **Normal** | 無加工の標準カメラ映像 |
+| **Gray** | NTSC推奨係数を用いた高精度なグレースケール化 |
+| **Threshold** | 輝度127を基準とした白と黒の二値化処理 |
+| **Invert** | 色反転（ネガポジ反転） |
+| **Red / Blue / Green** | HSV空間で特定の色（赤・青・緑）のみを抽出し、他を暗転させる色変調 |
+| **Mosaic** | 指定ブロックサイズ（8px）ごとのピクセルサンプリングによるモザイク処理 |
+| **Edge** | 隣接ピクセル（右・下）との輝度差分を合成したエッジ（輪郭）検出 |
+| **Posterize** | 色階調を減らす（64段階区切り）ポスタライズ処理 |
+| **Motion** | 前フレームとのRGB差分を計算し、動きのある部分だけを白く浮き上がらせる動体検知 |
+| **AfterImage** | 過去フレームのピクセルを80%蓄積させる残像エフェクト |
+| **Emboss** | 左隣のピクセルとの差分に中間グレー（128）を足したエンボス（浮き彫り）加工 |
+| **Blur** | 周辺3×3ピクセルの重み付け平均によるガウシアン風のブラー（平滑化） |
+| **RGBSplit** | R（右に10px）とB（左に10px）のチャンネルを意図的にずらす色収差エフェクト |
+| **Glitch** | ランダムな座標オフセットによるノイズ・グリッチエフェクト |
 
+---
+
+## 🛠 使い方 (Usage)
+
+1. **コンポーネントの添付** 適当なGameObject（例: `ImageProcessor`）を作成し、本スクリプトをアタッチします。
+2. **UIのバインド** インスペクターから以下のUI要素をアタッチしてください。
+   * `Camera Image`: 映像を表示するための **RawImage**
+   * `Mode Text`: 現在のモード名を表示するための **TextMeshPro - Text**
+3. **モードの切り替え** 公開されている `SetNormal()` や `SetGray()` などのパブリックメソッドを、UIの Button などの `OnClick()` イベントに登録することで、実行中にリアルタイムでモードを切り替えることができます。
+
+---
+
+## 💡 技術的な特徴・アルゴリズム
+
+### 1. グレースケール（輝度）計算
+人間の目の特性に合わせた **NTSC推奨係数（Luma）** を採用しています。
+$$Y = 0.299R + 0.587G + 0.114B$$
+
+### 2. 空間フィルタリング（Blur / Edge / Emboss）
+シェーダー（GPU）ではなく、C#のループ処理内でピクセル配列のインデックス（`i + width` や `i - 1` など）を計算し、近傍ピクセルへアクセスすることで各種カーネル処理や差分抽出を実現しています。
+
+> ⚠️ **パフォーマンスに関する注意点** > 本スクリプトはCPU上でピクセル配列全体（`GetPixels32` / `SetPixels32`）のループ処理を毎フレーム実行します。そのため、カメラの解像度（WebCamTextureの解像度）が高すぎる場合、フレームレート（FPS）が低下する可能性があります。パフォーマンスを重視する場合は、解像度を下げるか、Compute Shader / Fragment Shaderへの移植を推奨します。
+
+---
+
+## 💻 開発環境
+* Unity 2021.3 LTS / 2022.3 LTS 動作確認済み
+* TextMeshPro 導入済みであること
